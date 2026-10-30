@@ -13,7 +13,6 @@ import lombok.Getter;
 public class SupplySelectorModel implements IModel<SupplySelectorController> {
 
   @Getter private final BiConsumer<Supply, Collection<ShoppingItem>> consumer;
-  @Getter private final Map<ArticleChange, List<Article>> articleChangeCollector = new HashMap<>();
 
   public SupplySelectorModel(BiConsumer<Supply, Collection<ShoppingItem>> consumer) {
     this.consumer = consumer;

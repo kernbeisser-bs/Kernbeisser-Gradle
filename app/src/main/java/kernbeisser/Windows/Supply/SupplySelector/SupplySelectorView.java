@@ -8,9 +8,11 @@ import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
 import java.awt.*;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.function.Predicate;
 import javax.swing.*;
@@ -25,7 +27,6 @@ import kernbeisser.Tasks.ArticleComparedToCatalogEntry;
 import kernbeisser.Useful.Date;
 import kernbeisser.Useful.Icons;
 import kernbeisser.Useful.Tools;
-import kernbeisser.Useful.UiTools;
 import kernbeisser.Windows.MVC.ComponentController.ComponentController;
 import kernbeisser.Windows.MVC.IView;
 import kernbeisser.Windows.MVC.Linked;
@@ -338,6 +339,9 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
 
   private static final Icon PRICE_ICON =
       Icons.defaultIcon(FontAwesome.VIACOIN, new Color(0, 126, 107));
+  private static final Icon ACCEPTED_ICON =
+      Icons.defaultIcon(FontAwesome.CHECK_SQUARE_O, Color.BLACK);
+  private static final Icon EXCLUDED_ICON = Icons.defaultIcon(FontAwesome.SQUARE_O, Color.BLACK);
   private static final Icon DEPOSIT_ICON =
       Icons.defaultIcon(FontAwesome.BEER, new Color(0, 43, 151));
   private static final Icon CONTAINER_ICON =
@@ -385,37 +389,80 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
     }
   }
 
-  public void showArticleChanges(Map<ArticleChange, List<Article>> articleChanges) {
-    if (articleChanges.isEmpty()) {
-      return;
+  /**
+   * Shows the pending article changes. All changes are accepted by default, single changes can be
+   * excluded by clicking their checkbox.
+   *
+   * @return the accepted changes, empty if the user declined all changes, or empty optional if the
+   *     dialog was closed and the import should be aborted
+   */
+  public Optional<List<ArticleChangeRow>> askArticleChanges(List<ArticleChangeRow> rows) {
+    if (rows.isEmpty()) {
+      return Optional.of(List.of());
     }
-    ObjectTable<ArticleChange> table =
-        new ObjectTable<ArticleChange>(
-            articleChanges.keySet().stream().sorted().toList(),
-            Columns.createIconColumn("", SupplySelectorView::getChangeIcon),
-            Columns.create("Änderung", SupplySelectorView::getChangeDesignation)
+    Set<ArticleChangeRow> excluded = Collections.newSetFromMap(new IdentityHashMap<>());
+    // the dialog is a separate window, so only the table itself has to be repainted
+    ObjectTable<ArticleChangeRow> table = new ObjectTable<>(rows);
+    table.setColumns(
+            Columns.<ArticleChangeRow>createIconColumn(
+                    "Übernehmen", row -> excluded.contains(row) ? EXCLUDED_ICON : ACCEPTED_ICON)
+                .withLeftClickConsumer(
+                    row -> {
+                      if (!excluded.remove(row)) {
+                        excluded.add(row);
+                      }
+                      table.repaint();
+                    })
+                .withPreferredWidth(90),
+            Columns.<ArticleChangeRow>createIconColumn(
+                "", row -> getChangeIcon(row.change())),
+            Columns.<ArticleChangeRow>create(
+                    "Änderung", row -> getChangeDesignation(row.change()))
                 .withPreferredWidth(200),
-            Columns.create("von", ArticleChange::getOldValue)
+            Columns.<ArticleChangeRow>create("von", row -> row.change().getOldValue())
                 .withPreferredWidth(50)
                 .withSorter(Column.NUMBER_SORTER),
-            Columns.create("zu", ArticleChange::getNewValue)
+            Columns.<ArticleChangeRow>create("zu", row -> row.change().getNewValue())
                 .withPreferredWidth(50)
                 .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChange>create("Anzahl", e -> articleChanges.get(e).size())
+            Columns.<ArticleChangeRow>create(
+                    "Lieferantennummer", row -> row.article().getSuppliersItemNumber())
+                .withPreferredWidth(100)
                 .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChange>createIconColumn(
-                Icons.defaultIcon(FontAwesome.TABLE, Color.BLUE),
-                e -> UiTools.showArticleList(getContent(), articleChanges.get(e)),
-                e -> !articleChanges.get(e).isEmpty()));
+            Columns.<ArticleChangeRow>create("KB-Nummer", row -> row.article().getKbNumber())
+                .withPreferredWidth(80)
+                .withSorter(Column.NUMBER_SORTER),
+            Columns.<ArticleChangeRow>create("Artikel", row -> row.article().getName())
+                .withPreferredWidth(250));
 
-    JLabel label = new JLabel("Folgende Artikel-Änderungen wurden vorgenommen:");
+    JLabel label =
+        new JLabel(
+            "<html>Sollen die folgenden Artikel-Änderungen übernommen werden? "
+                + "Mit Klick auf das Kästchen lassen sich einzelne Änderungen ausschließen.</html>");
     label.setFont(label.getFont().deriveFont(Font.ITALIC));
     JPanel tablePanel = new JPanel(new BorderLayout());
-    ;
     tablePanel.add(label, BorderLayout.NORTH);
-    tablePanel.add(new JScrollPane(table), BorderLayout.CENTER);
-    JOptionPane.showMessageDialog(
-        getContent(), tablePanel, "Artikeländerungen", JOptionPane.INFORMATION_MESSAGE);
+    JScrollPane scrollPane = new JScrollPane(table);
+    // about 1.5 times the default size of the dialog
+    scrollPane.setPreferredSize(new Dimension(1200, 600));
+    tablePanel.add(scrollPane, BorderLayout.CENTER);
+    int choice =
+        JOptionPane.showOptionDialog(
+            getContent(),
+            tablePanel,
+            "Artikeländerungen",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            new Object[] {"Ja", "Nein"},
+            "Ja");
+    if (choice == JOptionPane.CLOSED_OPTION) {
+      return Optional.empty();
+    }
+    if (choice == 1) {
+      return Optional.of(List.of());
+    }
+    return Optional.of(rows.stream().filter(row -> !excluded.contains(row)).toList());
   }
 
   // @spotless:off
