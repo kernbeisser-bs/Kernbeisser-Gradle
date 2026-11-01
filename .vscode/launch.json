@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Kernbeisser (dev DB)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "kernbeisser.Main",
+      "projectName": "app",
+      "cwd": "${workspaceFolder}",
+      "vmArgs": "-Xmx1024m -splash:production/KernbeisserSplash.png -javaagent:security/build/libs/security.jar",
+      "args": "-configFile:${workspaceFolder}/.dev/config.json",
+      "preLaunchTask": "make dev-setup"
+    },
+    {
+      "name": "Attach debugger (localhost:5005)",
+      "type": "java",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005
+    }
+  ]
+}
