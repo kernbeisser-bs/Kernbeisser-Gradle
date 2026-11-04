@@ -4,7 +4,6 @@ import jakarta.persistence.NoResultException;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.*;
-import java.util.List;
 import kernbeisser.CustomComponents.BarcodeCapture;
 import kernbeisser.CustomComponents.KeyCapture;
 import kernbeisser.DBEntities.*;
@@ -206,10 +205,7 @@ public class SupplyController extends Controller<SupplyView, SupplyModel> {
   }
 
   public static ShoppingItem createShoppingItem(
-      Supplier kkSupplier,
-      LineContent content,
-      int orderNo,
-      boolean ignoreBarcode) {
+      Supplier kkSupplier, LineContent content, int orderNo, boolean ignoreBarcode) {
     ShoppingItem shoppingItem =
         new ShoppingItem(
             ArticleRepository.updateOrCreateArticleFromLineContent(

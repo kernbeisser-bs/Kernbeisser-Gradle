@@ -29,8 +29,6 @@ import rs.groump.PermissionKey;
 
 public class PrintLabelsController extends Controller<PrintLabelsView, PrintLabelsModel> {
 
-  private static final int MANY_LABELS_LIMIT = 3;
-
   @Linked private final CollectionController<Article> articles;
 
   private final JButton printButton = new JButton();
@@ -116,8 +114,9 @@ public class PrintLabelsController extends Controller<PrintLabelsView, PrintLabe
   }
 
   private void print() {
-    Map<Article, Integer> manyLabels = model.getArticlesWithManyLabels(articles, MANY_LABELS_LIMIT);
-    if (!manyLabels.isEmpty() && !getView().confirmManyLabels(manyLabels)) return;
+    int threshold = Setting.LABEL_COUNT_WARNING_THRESHOLD.getIntValue();
+    Map<Article, Integer> manyLabels = model.getArticlesWithManyLabels(articles, threshold);
+    if (!manyLabels.isEmpty() && !getView().confirmManyLabels(manyLabels, threshold)) return;
     model.print(articles);
     if (getView().confirmPrintSuccess()) {
       articles.selectAllChosen();

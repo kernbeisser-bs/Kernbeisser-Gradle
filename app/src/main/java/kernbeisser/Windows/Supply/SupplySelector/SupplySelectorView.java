@@ -22,7 +22,6 @@ import kernbeisser.CustomComponents.ComboBox.AdvancedComboBox;
 import kernbeisser.CustomComponents.ObjectTable.Column;
 import kernbeisser.CustomComponents.ObjectTable.Columns.Columns;
 import kernbeisser.CustomComponents.ObjectTable.ObjectTable;
-import kernbeisser.DBEntities.Article;
 import kernbeisser.Tasks.ArticleComparedToCatalogEntry;
 import kernbeisser.Useful.Date;
 import kernbeisser.Useful.Icons;
@@ -337,17 +336,13 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
         JOptionPane.ERROR_MESSAGE);
   }
 
-  private static final Icon PRICE_ICON =
-      Icons.defaultIcon(FontAwesome.VIACOIN, new Color(0, 126, 107));
-  private static final Icon ACCEPTED_ICON =
-      Icons.defaultIcon(FontAwesome.CHECK_SQUARE_O, Color.BLACK);
-  private static final Icon EXCLUDED_ICON = Icons.defaultIcon(FontAwesome.SQUARE_O, Color.BLACK);
+  private static final Icon PRICE_ICON = Icons.defaultIcon(FontAwesome.EUR, new Color(0, 126, 107));
   private static final Icon DEPOSIT_ICON =
       Icons.defaultIcon(FontAwesome.BEER, new Color(0, 43, 151));
   private static final Icon CONTAINER_ICON =
       Icons.defaultIcon(FontAwesome.SHOPPING_CART, new Color(153, 72, 228));
   private static final Icon SIZE_ICON =
-      Icons.defaultIcon(FontAwesome.LINE_CHART, new Color(193, 101, 62));
+      Icons.defaultIcon(FontAwesome.ARROWS_ALT, new Color(193, 101, 62));
 
   private static Icon getChangeIcon(ArticleChange result) {
     switch (result.getType()) {
@@ -393,8 +388,8 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
    * Shows the pending article changes. All changes are accepted by default, single changes can be
    * excluded by clicking their checkbox.
    *
-   * @return the accepted changes, empty if the user declined all changes, or empty optional if the
-   *     dialog was closed and the import should be aborted
+   * @return the accepted changes (empty if the user deselected all), or empty optional if the
+   *     dialog was cancelled and the import should be aborted
    */
   public Optional<List<ArticleChangeRow>> askArticleChanges(List<ArticleChangeRow> rows) {
     if (rows.isEmpty()) {
@@ -404,36 +399,34 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
     // the dialog is a separate window, so only the table itself has to be repainted
     ObjectTable<ArticleChangeRow> table = new ObjectTable<>(rows);
     table.setColumns(
-            Columns.<ArticleChangeRow>createIconColumn(
-                    "Übernehmen", row -> excluded.contains(row) ? EXCLUDED_ICON : ACCEPTED_ICON)
-                .withLeftClickConsumer(
-                    row -> {
-                      if (!excluded.remove(row)) {
-                        excluded.add(row);
-                      }
-                      table.repaint();
-                    })
-                .withPreferredWidth(90),
-            Columns.<ArticleChangeRow>createIconColumn(
-                "", row -> getChangeIcon(row.change())),
-            Columns.<ArticleChangeRow>create(
-                    "Änderung", row -> getChangeDesignation(row.change()))
-                .withPreferredWidth(200),
-            Columns.<ArticleChangeRow>create("von", row -> row.change().getOldValue())
-                .withPreferredWidth(50)
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChangeRow>create("zu", row -> row.change().getNewValue())
-                .withPreferredWidth(50)
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChangeRow>create(
-                    "Lieferantennummer", row -> row.article().getSuppliersItemNumber())
-                .withPreferredWidth(100)
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChangeRow>create("KB-Nummer", row -> row.article().getKbNumber())
-                .withPreferredWidth(80)
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChangeRow>create("Artikel", row -> row.article().getName())
-                .withPreferredWidth(250));
+        Columns.<ArticleChangeRow>createSortableBooleanIcon(
+                "Übernehmen", row -> !excluded.contains(row))
+            .withLeftClickConsumer(
+                row -> {
+                  if (!excluded.remove(row)) {
+                    excluded.add(row);
+                  }
+                  table.repaint();
+                })
+            .withPreferredWidth(90),
+        Columns.<ArticleChangeRow>createIconColumn("", row -> getChangeIcon(row.change())),
+        Columns.<ArticleChangeRow>create("Änderung", row -> getChangeDesignation(row.change()))
+            .withPreferredWidth(200),
+        Columns.<ArticleChangeRow>create("von", row -> row.change().getOldValue())
+            .withPreferredWidth(50)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create("zu", row -> row.change().getNewValue())
+            .withPreferredWidth(50)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create(
+                "Lieferantennummer", row -> row.article().getSuppliersItemNumber())
+            .withPreferredWidth(100)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create("KB-Nummer", row -> row.article().getKbNumber())
+            .withPreferredWidth(80)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create("Artikel", row -> row.article().getName())
+            .withPreferredWidth(250));
 
     JLabel label =
         new JLabel(
@@ -446,21 +439,31 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
     // about 1.5 times the default size of the dialog
     scrollPane.setPreferredSize(new Dimension(1200, 600));
     tablePanel.add(scrollPane, BorderLayout.CENTER);
+    JButton selectAll = new JButton("Alle auswählen");
+    selectAll.addActionListener(
+        e -> {
+          excluded.clear();
+          table.repaint();
+        });
+    JButton deselectAll = new JButton("Alle abwählen");
+    deselectAll.addActionListener(
+        e -> {
+          excluded.addAll(rows);
+          table.repaint();
+        });
+    JPanel selectionButtons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    selectionButtons.add(selectAll);
+    selectionButtons.add(deselectAll);
+    tablePanel.add(selectionButtons, BorderLayout.SOUTH);
     int choice =
-        JOptionPane.showOptionDialog(
+        JOptionPane.showConfirmDialog(
             getContent(),
             tablePanel,
             "Artikeländerungen",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            new Object[] {"Ja", "Nein"},
-            "Ja");
-    if (choice == JOptionPane.CLOSED_OPTION) {
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.QUESTION_MESSAGE);
+    if (choice != JOptionPane.OK_OPTION) {
       return Optional.empty();
-    }
-    if (choice == 1) {
-      return Optional.of(List.of());
     }
     return Optional.of(rows.stream().filter(row -> !excluded.contains(row)).toList());
   }

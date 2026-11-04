@@ -898,20 +898,19 @@ public class ArticleRepository {
   }
 
   public static void applyArticleChange(ArticleChangeRow row) {
-    @Cleanup EntityManager em = DBConnection.getEntityManager();
-    @Cleanup("commit")
-    EntityTransaction et = em.getTransaction();
-    et.begin();
-    Article article = em.find(Article.class, row.article().getId());
-    ArticleChange change = row.change();
-    switch (change.getType()) {
-      case ArticleChange.PRICE -> article.setNetPrice(change.getNewValue());
-      case ArticleChange.SINGLE_DEPOSIT -> article.setSingleDeposit(change.getNewValue());
-      case ArticleChange.CONTAINER_SIZE -> article.setContainerSize(change.getNewValue());
-      default -> throw new IllegalArgumentException("unsupported change: " + change.log());
-    }
-    em.merge(article);
-    log.info("Article [" + article.getSuppliersItemNumber() + "]: " + change.log());
+    Tools.runInSession(
+        em -> {
+          Article article = em.find(Article.class, row.article().getId());
+          ArticleChange change = row.change();
+          switch (change.getType()) {
+            case ArticleChange.PRICE -> article.setNetPrice(change.getNewValue());
+            case ArticleChange.SINGLE_DEPOSIT -> article.setSingleDeposit(change.getNewValue());
+            case ArticleChange.CONTAINER_SIZE -> article.setContainerSize(change.getNewValue());
+            default -> throw new IllegalArgumentException("unsupported change: " + change.log());
+          }
+          em.merge(article);
+          log.info("Article [" + article.getSuppliersItemNumber() + "]: " + change.log());
+        });
   }
 
   public static Article updateOrCreateArticleFromLineContent(

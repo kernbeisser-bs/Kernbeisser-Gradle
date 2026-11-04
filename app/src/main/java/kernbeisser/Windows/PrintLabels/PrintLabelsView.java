@@ -44,11 +44,14 @@ public class PrintLabelsView implements IView<PrintLabelsController> {
         == JOptionPane.YES_OPTION;
   }
 
-  public boolean confirmManyLabels(Map<Article, Integer> labelCounts) {
+  public boolean confirmManyLabels(Map<Article, Integer> labelCounts, int threshold) {
     StringBuilder message =
-        new StringBuilder("Für folgende Artikel sollen mehr als 3 Etiketten gedruckt werden:\n\n");
+        new StringBuilder(
+            "Für folgende Artikel sollen mehr als %d Etiketten gedruckt werden:\n\n"
+                .formatted(threshold));
     labelCounts.forEach(
-        (article, count) -> message.append(article.getName()).append(": ").append(count).append("\n"));
+        (article, count) ->
+            message.append(article.getName()).append(": ").append(count).append("\n"));
     message.append("\nTrotzdem drucken?");
     return JOptionPane.showConfirmDialog(
             getContent(),

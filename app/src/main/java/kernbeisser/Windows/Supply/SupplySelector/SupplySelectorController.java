@@ -214,8 +214,7 @@ public class SupplySelectorController extends Controller<SupplySelectorView, Sup
         supply.getSupplierFiles().stream()
             .flatMap(f -> f.collectPendingArticleChanges().stream())
             .toList();
-    Optional<List<ArticleChangeRow>> acceptedChanges =
-        getView().askArticleChanges(pendingChanges);
+    Optional<List<ArticleChangeRow>> acceptedChanges = getView().askArticleChanges(pendingChanges);
     if (acceptedChanges.isEmpty()) {
       return;
     }
