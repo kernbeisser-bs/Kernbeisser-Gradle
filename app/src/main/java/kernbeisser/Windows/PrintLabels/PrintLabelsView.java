@@ -4,6 +4,7 @@ import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import jakarta.persistence.NoResultException;
 import java.awt.*;
+import java.util.Map;
 import javax.swing.*;
 import kernbeisser.CustomComponents.ObjectTable.ObjectTable;
 import kernbeisser.DBEntities.Article;
@@ -40,6 +41,24 @@ public class PrintLabelsView implements IView<PrintLabelsController> {
             "Später drucken",
             JOptionPane.YES_NO_OPTION,
             JOptionPane.QUESTION_MESSAGE)
+        == JOptionPane.YES_OPTION;
+  }
+
+  public boolean confirmManyLabels(Map<Article, Integer> labelCounts, int threshold) {
+    StringBuilder message =
+        new StringBuilder(
+            "Für folgende Artikel sollen mehr als %d Etiketten gedruckt werden:\n\n"
+                .formatted(threshold));
+    labelCounts.forEach(
+        (article, count) ->
+            message.append(article.getName()).append(": ").append(count).append("\n"));
+    message.append("\nTrotzdem drucken?");
+    return JOptionPane.showConfirmDialog(
+            getContent(),
+            message.toString(),
+            "Viele Etiketten",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE)
         == JOptionPane.YES_OPTION;
   }
 

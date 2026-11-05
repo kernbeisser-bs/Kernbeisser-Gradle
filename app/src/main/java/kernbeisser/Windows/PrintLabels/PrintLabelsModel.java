@@ -70,6 +70,15 @@ public class PrintLabelsModel implements IModel<PrintLabelsController> {
     return article.getSupplier().getName();
   }
 
+  Map<Article, Integer> getArticlesWithManyLabels(
+      CollectionController<Article> articles, int threshold) {
+    Map<Article, Integer> result = new LinkedHashMap<>();
+    articles.getModel().getLoaded().stream()
+        .filter(a -> printPoolMap.getOrDefault(a, 0) > threshold)
+        .forEach(a -> result.put(a, printPoolMap.get(a)));
+    return result;
+  }
+
   void print(CollectionController<Article> articles) {
     List<Article> printPool =
         articles.getModel().getLoaded().stream()

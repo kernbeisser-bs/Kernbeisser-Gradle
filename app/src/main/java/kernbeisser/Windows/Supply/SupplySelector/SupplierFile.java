@@ -16,7 +16,6 @@ import kernbeisser.CustomComponents.ObjectTable.Columns.Columns;
 import kernbeisser.CustomComponents.ObjectTable.ObjectTable;
 import kernbeisser.DBConnection.DBConnection;
 import kernbeisser.DBConnection.QueryBuilder;
-import kernbeisser.DBEntities.Article;
 import kernbeisser.DBEntities.Repositories.ArticleRepository;
 import kernbeisser.DBEntities.ShoppingItem;
 import kernbeisser.DBEntities.ShoppingItem_;
@@ -83,8 +82,17 @@ public class SupplierFile {
         .collect(Collectors.toCollection(ArrayList::new));
   }
 
-  public Collection<ShoppingItem> collectShoppingItems(
-      JComponent errorDisplayComponent, Map<ArticleChange, List<Article>> articleChangeCollector) {
+  public List<ArticleChangeRow> collectPendingArticleChanges() {
+    List<ArticleChangeRow> result = new ArrayList<>();
+    for (LineContent content : contents) {
+      if (SupplyController.shouldBecomeShoppingItem(content)) {
+        result.addAll(ArticleRepository.findPendingArticleChanges(Constants.KK_SUPPLIER, content));
+      }
+    }
+    return result;
+  }
+
+  public Collection<ShoppingItem> collectShoppingItems(JComponent errorDisplayComponent) {
 
     List<ArticleCatalogState> irrelevantCatalogStates =
         Collections.singletonList(ArticleCatalogState.BARCODE_CHANGED);
@@ -113,8 +121,7 @@ public class SupplierFile {
         }
       }
       shoppingItems.add(
-          SupplyController.createShoppingItem(
-              kkSupplier, content, header.getOrderNr(), noBarcode, articleChangeCollector));
+          SupplyController.createShoppingItem(kkSupplier, content, header.getOrderNr(), noBarcode));
     }
     if (!collectErrors.isEmpty()) {
       ObjectTable<ArticleComparedToCatalogEntry> errors =

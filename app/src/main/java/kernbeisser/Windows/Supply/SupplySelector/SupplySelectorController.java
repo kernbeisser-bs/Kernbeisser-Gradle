@@ -149,7 +149,13 @@ public class SupplySelectorController extends Controller<SupplySelectorView, Sup
 
   public void openOtherDir(String pathBefore) {
     JFileChooser fileChooser = new JFileChooser();
-    fileChooser.setCurrentDirectory(new File(pathBefore));
+    // missing drive (e.g. unplugged USB stick): start at the nearest existing parent instead.
+    // The home directory must not be used here, the file chooser fails to open in it.
+    File startDir = new File(pathBefore);
+    while (startDir != null && !startDir.isDirectory()) {
+      startDir = startDir.getParentFile();
+    }
+    fileChooser.setCurrentDirectory(startDir != null ? startDir : File.listRoots()[0]);
     fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     fileChooser.setDialogTitle("Kornkraft Ordner auswählen");
     fileChooser.addActionListener(
@@ -204,18 +210,23 @@ public class SupplySelectorController extends Controller<SupplySelectorView, Sup
       return;
     }
     Supply supply = selected.get();
+    List<ArticleChangeRow> pendingChanges =
+        supply.getSupplierFiles().stream()
+            .flatMap(f -> f.collectPendingArticleChanges().stream())
+            .toList();
+    Optional<List<ArticleChangeRow>> acceptedChanges = getView().askArticleChanges(pendingChanges);
+    if (acceptedChanges.isEmpty()) {
+      return;
+    }
+    acceptedChanges.get().forEach(ArticleRepository::applyArticleChange);
     model
         .getConsumer()
         .accept(
             supply,
             supply.getSupplierFiles().stream()
-                .map(
-                    f ->
-                        f.collectShoppingItems(
-                            getView().getContent(), model.getArticleChangeCollector()))
+                .map(f -> f.collectShoppingItems(getView().getContent()))
                 .flatMap(Collection::stream)
                 .collect(Collectors.toCollection(ArrayList::new)));
-    getView().showArticleChanges(model.getArticleChangeCollector());
     getView().back();
   }
 

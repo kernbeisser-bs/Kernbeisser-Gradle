@@ -114,6 +114,9 @@ public class PrintLabelsController extends Controller<PrintLabelsView, PrintLabe
   }
 
   private void print() {
+    int threshold = Setting.LABEL_COUNT_WARNING_THRESHOLD.getIntValue();
+    Map<Article, Integer> manyLabels = model.getArticlesWithManyLabels(articles, threshold);
+    if (!manyLabels.isEmpty() && !getView().confirmManyLabels(manyLabels, threshold)) return;
     model.print(articles);
     if (getView().confirmPrintSuccess()) {
       articles.selectAllChosen();

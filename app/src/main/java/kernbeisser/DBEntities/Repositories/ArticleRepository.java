@@ -6,7 +6,6 @@ import static kernbeisser.Enums.ArticleDeletionResult.*;
 import static kernbeisser.Enums.ShopRange.DISCONTINUED;
 import static kernbeisser.Useful.Constants.KK_SUPPLIER;
 
-import com.google.common.collect.Lists;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,6 +24,7 @@ import kernbeisser.Exeptions.handler.UnexpectedExceptionHandler;
 import kernbeisser.Tasks.ArticleComparedToCatalogEntry;
 import kernbeisser.Useful.Tools;
 import kernbeisser.Windows.Supply.SupplySelector.ArticleChange;
+import kernbeisser.Windows.Supply.SupplySelector.ArticleChangeRow;
 import kernbeisser.Windows.Supply.SupplySelector.LineContent;
 import lombok.Cleanup;
 import lombok.extern.log4j.Log4j2;
@@ -863,22 +863,58 @@ public class ArticleRepository {
     return result;
   }
 
-  private static void collectChange(
-      Map<ArticleChange, List<Article>> articleChangeCollector,
-      ArticleChange change,
-      Article article) {
-    List<Article> articles =
-        articleChangeCollector.putIfAbsent(change, Lists.newArrayList(article));
-    if (articles != null) {
-      articles.add(article);
+  /**
+   * Compares the article in the database with the supply line without changing anything. Price,
+   * single deposit and container size changes are only applied after the user confirmed them, see
+   * {@link #applyArticleChange(ArticleChangeRow)}.
+   */
+  public static List<ArticleChangeRow> findPendingArticleChanges(
+      Supplier kkSupplier, LineContent content) {
+    List<ArticleChangeRow> result = new ArrayList<>();
+    Optional<Article> articleInDb = getBySuppliersItemNumber(kkSupplier, content.getKkNumber());
+    if (articleInDb.isEmpty()) {
+      return result;
     }
+    Article article = articleInDb.get();
+    double newPrice = content.getPriceKb();
+    double newSingleDeposit = content.getSingleDeposit();
+    double newContainerSize = content.getContainerSize();
+    // Aktionsartikel behalten ihren Preis, der Lieferpreis wird nicht übernommen
+    if (!article.isOffer() && Math.abs(article.getNetPrice() - newPrice) >= 0.01) {
+      result.add(
+          new ArticleChangeRow(ArticleChange.PRICE(article.getNetPrice(), newPrice), article));
+    }
+    if (newSingleDeposit > 0 && article.getSingleDeposit() != newSingleDeposit) {
+      result.add(
+          new ArticleChangeRow(
+              ArticleChange.SINGLE_DEPOSIT(article.getSingleDeposit(), newSingleDeposit), article));
+    }
+    if (!article.isWeighable() && article.getContainerSize() != newContainerSize) {
+      result.add(
+          new ArticleChangeRow(
+              ArticleChange.CONTAINER_SIZE(article.getContainerSize(), newContainerSize), article));
+    }
+    return result;
+  }
+
+  public static void applyArticleChange(ArticleChangeRow row) {
+    Tools.runInSession(
+        em -> {
+          Article article = em.find(Article.class, row.article().getId());
+          ArticleChange change = row.change();
+          switch (change.getType()) {
+            case ArticleChange.PRICE -> article.setNetPrice(change.getNewValue());
+            case ArticleChange.SINGLE_DEPOSIT -> article.setSingleDeposit(change.getNewValue());
+            case ArticleChange.CONTAINER_SIZE -> article.setContainerSize(change.getNewValue());
+            default -> throw new IllegalArgumentException("unsupported change: " + change.log());
+          }
+          em.merge(article);
+          log.info("Article [" + article.getSuppliersItemNumber() + "]: " + change.log());
+        });
   }
 
   public static Article updateOrCreateArticleFromLineContent(
-      Supplier kkSupplier,
-      LineContent content,
-      boolean noBarcode,
-      Map<ArticleChange, List<Article>> articleChangeCollector) {
+      Supplier kkSupplier, LineContent content, boolean noBarcode) {
     Optional<Article> articleInDb = getBySuppliersItemNumber(kkSupplier, content.getKkNumber());
     ShopRange shopRange =
         (content.getContainerMultiplier() - Tools.ifNull(content.getUserPreorderCount(), 0) > 0
@@ -891,13 +927,7 @@ public class ArticleRepository {
       EntityTransaction et = em.getTransaction();
       et.begin();
       Article article = em.find(Article.class, articleInDb.map(Article::getId).get());
-      final List<ArticleChange> changes = new ArrayList<>();
-      ArticleChange change;
-      double newPrice = content.getPriceKb();
       boolean newWeighable = content.isWeighableKb();
-      double newSingleDeposit = content.getSingleDeposit();
-      double newContainerDeposit = content.getContainerDeposit();
-      double newContainerSize = content.getContainerSize();
       String logInfo = "Article [" + article.getSuppliersItemNumber() + "]:";
       ShopRange articleShopRange = article.getShopRange();
       if (!articleShopRange.equals(ShopRange.PERMANENT_RANGE)) {
@@ -907,42 +937,23 @@ public class ArticleRepository {
           logInfo += " updated shop range [%s] -".formatted(article.getShopRange().toString());
         }
       }
-      if (Math.abs(article.getNetPrice() - newPrice) >= 0.01) {
-        dirty = true;
-        change = ArticleChange.PRICE(article.getNetPrice(), newPrice);
-        logInfo += change.log();
-        article.setNetPrice(newPrice);
-      }
+      // price, single deposit and container size changes are applied after confirmation,
+      // see findPendingArticleChanges and applyArticleChange
       if (article.isWeighable() != newWeighable) {
         dirty = true;
         logInfo += " weighable change [%b -> %b] -".formatted(article.isWeighable(), newWeighable);
         article.setWeighable(newWeighable);
       }
       // TODO roll back work around for weird catalog deposits
-      if (newSingleDeposit > 0 && article.getSingleDeposit() != newSingleDeposit) {
-        dirty = true;
-        change = ArticleChange.SINGLE_DEPOSIT(article.getSingleDeposit(), newSingleDeposit);
-        logInfo += change.log();
-        collectChange(articleChangeCollector, change, article);
-        article.setSingleDeposit(newSingleDeposit);
-      }
       /* if (article.getContainerDeposit() != newContainerDeposit) {
         dirty = true;
         change =
             ArticleChange.CONTAINER_DEPOSIT(article.getContainerDeposit(), newContainerDeposit);
         logInfo += change.log();
-        collectChange(articleChangeCollector, change, article);
         article.setContainerDeposit(newContainerDeposit);
       }
       TODO up to here
        */
-      if (!article.isWeighable() && article.getContainerSize() != newContainerSize) {
-        dirty = true;
-        change = ArticleChange.CONTAINER_SIZE(article.getContainerSize(), newContainerSize);
-        logInfo += change.log();
-        collectChange(articleChangeCollector, change, article);
-        article.setContainerSize(newContainerSize);
-      }
       if (dirty) {
         em.merge(article);
         log.info(logInfo.substring(0, logInfo.length() - 2));

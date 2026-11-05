@@ -4,7 +4,6 @@ import jakarta.persistence.NoResultException;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.*;
-import java.util.List;
 import kernbeisser.CustomComponents.BarcodeCapture;
 import kernbeisser.CustomComponents.KeyCapture;
 import kernbeisser.DBEntities.*;
@@ -15,7 +14,6 @@ import kernbeisser.Useful.Tools;
 import kernbeisser.Windows.MVC.Controller;
 import kernbeisser.Windows.PrintLabels.PrintLabelsController;
 import kernbeisser.Windows.PrintLabels.PrintLabelsModel;
-import kernbeisser.Windows.Supply.SupplySelector.ArticleChange;
 import kernbeisser.Windows.Supply.SupplySelector.LineContent;
 import kernbeisser.Windows.Supply.SupplySelector.ResolveStatus;
 import kernbeisser.Windows.Supply.SupplySelector.SupplySelectorController;
@@ -26,7 +24,6 @@ import rs.groump.PermissionKey;
 public class SupplyController extends Controller<SupplyView, SupplyModel> {
   public final KeyCapture keyCapture;
   public final BarcodeCapture barcodeCapture;
-  private final Map<Article, List<ArticleChange>> articleChanges = new HashMap<>();
 
   @Key(PermissionKey.ACTION_OPEN_SUPPLY)
   public SupplyController() {
@@ -208,15 +205,11 @@ public class SupplyController extends Controller<SupplyView, SupplyModel> {
   }
 
   public static ShoppingItem createShoppingItem(
-      Supplier kkSupplier,
-      LineContent content,
-      int orderNo,
-      boolean ignoreBarcode,
-      Map<ArticleChange, List<Article>> articleChangeCollector) {
+      Supplier kkSupplier, LineContent content, int orderNo, boolean ignoreBarcode) {
     ShoppingItem shoppingItem =
         new ShoppingItem(
             ArticleRepository.updateOrCreateArticleFromLineContent(
-                kkSupplier, content, ignoreBarcode, articleChangeCollector),
+                kkSupplier, content, ignoreBarcode),
             0,
             false);
     double rawItemMultiplier =

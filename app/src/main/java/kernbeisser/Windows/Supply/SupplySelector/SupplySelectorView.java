@@ -8,9 +8,11 @@ import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
 import java.awt.*;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.function.Predicate;
 import javax.swing.*;
@@ -20,12 +22,10 @@ import kernbeisser.CustomComponents.ComboBox.AdvancedComboBox;
 import kernbeisser.CustomComponents.ObjectTable.Column;
 import kernbeisser.CustomComponents.ObjectTable.Columns.Columns;
 import kernbeisser.CustomComponents.ObjectTable.ObjectTable;
-import kernbeisser.DBEntities.Article;
 import kernbeisser.Tasks.ArticleComparedToCatalogEntry;
 import kernbeisser.Useful.Date;
 import kernbeisser.Useful.Icons;
 import kernbeisser.Useful.Tools;
-import kernbeisser.Useful.UiTools;
 import kernbeisser.Windows.MVC.ComponentController.ComponentController;
 import kernbeisser.Windows.MVC.IView;
 import kernbeisser.Windows.MVC.Linked;
@@ -336,14 +336,13 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
         JOptionPane.ERROR_MESSAGE);
   }
 
-  private static final Icon PRICE_ICON =
-      Icons.defaultIcon(FontAwesome.VIACOIN, new Color(0, 126, 107));
+  private static final Icon PRICE_ICON = Icons.defaultIcon(FontAwesome.EUR, new Color(0, 126, 107));
   private static final Icon DEPOSIT_ICON =
       Icons.defaultIcon(FontAwesome.BEER, new Color(0, 43, 151));
   private static final Icon CONTAINER_ICON =
       Icons.defaultIcon(FontAwesome.SHOPPING_CART, new Color(153, 72, 228));
   private static final Icon SIZE_ICON =
-      Icons.defaultIcon(FontAwesome.LINE_CHART, new Color(193, 101, 62));
+      Icons.defaultIcon(FontAwesome.ARROWS_ALT, new Color(193, 101, 62));
 
   private static Icon getChangeIcon(ArticleChange result) {
     switch (result.getType()) {
@@ -385,37 +384,88 @@ public class SupplySelectorView implements IView<SupplySelectorController> {
     }
   }
 
-  public void showArticleChanges(Map<ArticleChange, List<Article>> articleChanges) {
-    if (articleChanges.isEmpty()) {
-      return;
+  /**
+   * Shows the pending article changes. All changes are accepted by default, single changes can be
+   * excluded by clicking their checkbox.
+   *
+   * @return the accepted changes (empty if the user deselected all), or empty optional if the
+   *     dialog was cancelled and the import should be aborted
+   */
+  public Optional<List<ArticleChangeRow>> askArticleChanges(List<ArticleChangeRow> rows) {
+    if (rows.isEmpty()) {
+      return Optional.of(List.of());
     }
-    ObjectTable<ArticleChange> table =
-        new ObjectTable<ArticleChange>(
-            articleChanges.keySet().stream().sorted().toList(),
-            Columns.createIconColumn("", SupplySelectorView::getChangeIcon),
-            Columns.create("Änderung", SupplySelectorView::getChangeDesignation)
-                .withPreferredWidth(200),
-            Columns.create("von", ArticleChange::getOldValue)
-                .withPreferredWidth(50)
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.create("zu", ArticleChange::getNewValue)
-                .withPreferredWidth(50)
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChange>create("Anzahl", e -> articleChanges.get(e).size())
-                .withSorter(Column.NUMBER_SORTER),
-            Columns.<ArticleChange>createIconColumn(
-                Icons.defaultIcon(FontAwesome.TABLE, Color.BLUE),
-                e -> UiTools.showArticleList(getContent(), articleChanges.get(e)),
-                e -> !articleChanges.get(e).isEmpty()));
+    Set<ArticleChangeRow> excluded = Collections.newSetFromMap(new IdentityHashMap<>());
+    // the dialog is a separate window, so only the table itself has to be repainted
+    ObjectTable<ArticleChangeRow> table = new ObjectTable<>(rows);
+    table.setColumns(
+        Columns.<ArticleChangeRow>createSortableBooleanIcon(
+                "Übernehmen", row -> !excluded.contains(row))
+            .withLeftClickConsumer(
+                row -> {
+                  if (!excluded.remove(row)) {
+                    excluded.add(row);
+                  }
+                  table.repaint();
+                })
+            .withPreferredWidth(90),
+        Columns.<ArticleChangeRow>createIconColumn("", row -> getChangeIcon(row.change())),
+        Columns.<ArticleChangeRow>create("Änderung", row -> getChangeDesignation(row.change()))
+            .withPreferredWidth(200),
+        Columns.<ArticleChangeRow>create("von", row -> row.change().getOldValue())
+            .withPreferredWidth(50)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create("zu", row -> row.change().getNewValue())
+            .withPreferredWidth(50)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create(
+                "Lieferantennummer", row -> row.article().getSuppliersItemNumber())
+            .withPreferredWidth(100)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create("KB-Nummer", row -> row.article().getKbNumber())
+            .withPreferredWidth(80)
+            .withSorter(Column.NUMBER_SORTER),
+        Columns.<ArticleChangeRow>create("Artikel", row -> row.article().getName())
+            .withPreferredWidth(250));
 
-    JLabel label = new JLabel("Folgende Artikel-Änderungen wurden vorgenommen:");
+    JLabel label =
+        new JLabel(
+            "<html>Sollen die folgenden Artikel-Änderungen übernommen werden? "
+                + "Mit Klick auf das Kästchen lassen sich einzelne Änderungen ausschließen.</html>");
     label.setFont(label.getFont().deriveFont(Font.ITALIC));
     JPanel tablePanel = new JPanel(new BorderLayout());
-    ;
     tablePanel.add(label, BorderLayout.NORTH);
-    tablePanel.add(new JScrollPane(table), BorderLayout.CENTER);
-    JOptionPane.showMessageDialog(
-        getContent(), tablePanel, "Artikeländerungen", JOptionPane.INFORMATION_MESSAGE);
+    JScrollPane scrollPane = new JScrollPane(table);
+    // about 1.5 times the default size of the dialog
+    scrollPane.setPreferredSize(new Dimension(1200, 600));
+    tablePanel.add(scrollPane, BorderLayout.CENTER);
+    JButton selectAll = new JButton("Alle auswählen");
+    selectAll.addActionListener(
+        e -> {
+          excluded.clear();
+          table.repaint();
+        });
+    JButton deselectAll = new JButton("Alle abwählen");
+    deselectAll.addActionListener(
+        e -> {
+          excluded.addAll(rows);
+          table.repaint();
+        });
+    JPanel selectionButtons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    selectionButtons.add(selectAll);
+    selectionButtons.add(deselectAll);
+    tablePanel.add(selectionButtons, BorderLayout.SOUTH);
+    int choice =
+        JOptionPane.showConfirmDialog(
+            getContent(),
+            tablePanel,
+            "Artikeländerungen",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.QUESTION_MESSAGE);
+    if (choice != JOptionPane.OK_OPTION) {
+      return Optional.empty();
+    }
+    return Optional.of(rows.stream().filter(row -> !excluded.contains(row)).toList());
   }
 
   // @spotless:off
