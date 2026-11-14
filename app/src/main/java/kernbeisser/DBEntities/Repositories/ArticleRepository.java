@@ -422,6 +422,9 @@ public class ArticleRepository {
 
   public static PriceList getValidPriceList(EntityManager em, Article article) {
     PriceList priceList = article.getPriceList();
+    if (priceList == null) {
+      priceList = PriceList.getCoveredIntakePriceList();
+    }
     if (!priceList.getName().equals("Verdeckte Aufnahme")) return priceList;
     return nextArticleTo(em, article.getSuppliersItemNumber(), article.getSupplier(), priceList)
         .getPriceList();
