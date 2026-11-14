@@ -106,7 +106,9 @@ public class CatalogImporter {
     }
     if (trueValue.equals(s)) return true;
     if (falseValue.equals(s)) return false;
-    return null;
+    if (s.isEmpty()) return null;
+    // e.g. shifted columns: report instead of silently storing null in a flag like aktionspreis
+    throw new InvalidValue("ungültiger Wert für " + f.getName() + ": " + s);
   }
 
   private static void parseField(CatalogEntry out, Field declaredField, String part)
@@ -160,6 +162,18 @@ public class CatalogImporter {
 
   public static CatalogEntry parseRowWithLog(String[] parts, List<Exception> errorLog) {
     return parseRowCore(parts, (e, value_field) -> errorLog.add(fieldError(e, value_field)));
+  }
+
+  // a delimiter followed by an even number of quotes is not inside a quoted field
+  private static final Pattern DELIMITER_OUTSIDE_QUOTES =
+      Pattern.compile(DELIMITER + "(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+
+  /**
+   * Splits a catalog line into its columns. Text fields may be quoted ("...") and then contain the
+   * delimiter, which must not split the field. The quotes are kept as part of the value.
+   */
+  static String[] splitLine(String line) {
+    return line.indexOf('"') < 0 ? line.split(DELIMITER) : DELIMITER_OUTSIDE_QUOTES.split(line);
   }
 
   private static Exception fieldError(Exception cause, String[] valueField) {
@@ -253,7 +267,7 @@ public class CatalogImporter {
       }
       Map<String, Double> depositEntries = new HashMap<>();
       for (int i = 1; i < catalogSource.size() - 1; i++) {
-        String[] parts = catalogSource.get(i).split(DELIMITER);
+        String[] parts = splitLine(catalogSource.get(i));
         List<Exception> rowLog = new ArrayList<>();
         List<String> faultyFields = new ArrayList<>();
         CatalogEntry catalogEntry =
