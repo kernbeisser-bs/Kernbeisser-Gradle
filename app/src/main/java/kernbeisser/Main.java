@@ -8,6 +8,7 @@ import javax.swing.*;
 import jiconfont.icons.font_awesome.FontAwesome;
 import jiconfont.swing.IconFontSwing;
 import kernbeisser.Config.Config;
+import kernbeisser.CustomComponents.SafeFileChooserUI;
 import kernbeisser.DBConnection.DBConnection;
 import kernbeisser.DBEntities.*;
 import kernbeisser.Enums.Setting;
@@ -110,6 +111,7 @@ public class Main {
         () -> {
           log.info("setting look and feel");
           setSettingLAF();
+          SafeFileChooserUI.install();
           log.info("register FontAwesome");
           IconFontSwing.register(FontAwesome.getIconFont());
           try {

@@ -154,7 +154,9 @@ public class CatalogEntry implements ActuallyCloneable {
   private Double empfVkAktion;
 
   // should be but isn't in bnn
-  private MetricUnits grundpreisEinheit;
+  // excluded from equals: older imports could not parse this field and left it empty, so
+  // comparing it would treat every unchanged catalog entry as modified on re-import
+  @EqualsAndHashCode.Exclude private MetricUnits grundpreisEinheit;
   private Double grundpreisFaktor;
   private Instant lieferbarAb;
   private Instant lieferbarBis;

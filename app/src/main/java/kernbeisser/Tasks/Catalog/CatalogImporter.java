@@ -10,6 +10,8 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import kernbeisser.DBEntities.CatalogEntry;
 import kernbeisser.Enums.MetricUnits;
 import kernbeisser.Enums.VAT;
@@ -59,17 +61,25 @@ public class CatalogImporter {
     return Date.parseInstantDate(s, Date.INSTANT_CATALOG_DATE);
   }
 
-  private static MetricUnits parseUnit(String s) throws InvalidValue {
-    switch (s) {
-      case "kg":
-        return MetricUnits.KILOGRAM;
-      case "l":
-        return MetricUnits.LITER;
-      case "":
-        return null;
-      default:
-        throw new InvalidValue("falsch codierte Einheit");
+  // BNN base price units are written with a reference amount, e.g. "1 kg", "100 g" or "1 l"
+  private static final Pattern BASE_PRICE_UNIT =
+      Pattern.compile("(?:\\d+(?:[.,]\\d+)?\\s*)?(\\S+)");
+
+  static MetricUnits parseUnit(String s) throws InvalidValue {
+    if (s.isBlank()) {
+      return null;
     }
+    Matcher matcher = BASE_PRICE_UNIT.matcher(s.trim());
+    if (!matcher.matches()) {
+      throw new InvalidValue("falsch codierte Einheit: " + s);
+    }
+    return switch (matcher.group(1).toLowerCase()) {
+      case "kg" -> MetricUnits.KILOGRAM;
+      case "g" -> MetricUnits.GRAM;
+      case "l" -> MetricUnits.LITER;
+      case "ml" -> MetricUnits.MILLILITER;
+      default -> throw new InvalidValue("falsch codierte Einheit: " + s);
+    };
   }
 
   private static VAT parseVAT(String s) throws InvalidValue {
