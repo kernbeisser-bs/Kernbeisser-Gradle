@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import kernbeisser.DBEntities.CatalogEntry;
 import kernbeisser.Enums.MetricUnits;
 import kernbeisser.Enums.VAT;
@@ -158,17 +159,24 @@ public class CatalogImporter {
   }
 
   public static CatalogEntry parseRowWithLog(String[] parts, List<Exception> errorLog) {
-    return parseRowCore(
-        parts,
-        (e, value_field) -> {
-          errorLog.add(
-              new Exception(
-                  "Fehler beim Schreiben des Wertes \""
-                      + value_field[0]
-                      + "\" in das Feld "
-                      + value_field[1],
-                  e));
-        });
+    return parseRowCore(parts, (e, value_field) -> errorLog.add(fieldError(e, value_field)));
+  }
+
+  private static Exception fieldError(Exception cause, String[] valueField) {
+    return new Exception(
+        "Fehler beim Schreiben des Wertes \"" + valueField[0] + "\" in das Feld " + valueField[1],
+        cause);
+  }
+
+  private static Exception rowError(List<Exception> fieldErrors) {
+    if (fieldErrors.size() == 1) {
+      return fieldErrors.get(0);
+    }
+    Exception rowError =
+        new Exception(
+            fieldErrors.stream().map(Exception::getMessage).collect(Collectors.joining("; ")));
+    fieldErrors.forEach(rowError::addSuppressed);
+    return rowError;
   }
 
   public static CatalogEntry parseRow(String[] parts) {
@@ -245,8 +253,16 @@ public class CatalogImporter {
       }
       Map<String, Double> depositEntries = new HashMap<>();
       for (int i = 1; i < catalogSource.size() - 1; i++) {
+        String[] parts = catalogSource.get(i).split(DELIMITER);
         List<Exception> rowLog = new ArrayList<>();
-        CatalogEntry catalogEntry = parseRowWithLog(catalogSource.get(i).split(DELIMITER), rowLog);
+        List<String> faultyFields = new ArrayList<>();
+        CatalogEntry catalogEntry =
+            parseRowCore(
+                parts,
+                (e, valueField) -> {
+                  rowLog.add(fieldError(e, valueField));
+                  faultyFields.add(valueField[1]);
+                });
         if (validTo != null) {
           catalogEntry.setKatalogGueltigBis(validTo);
         }
@@ -259,8 +275,11 @@ public class CatalogImporter {
         if (!containerDepositNo.trim().isEmpty()) {
           depositEntries.put(containerDepositNo, 0.0);
         }
-        for (Exception e : rowLog) {
-          readErrors.add(new CatalogImportError(Integer.toString(i), e));
+        if (!rowLog.isEmpty()) {
+          // one error per line, the details dialog marks all faulty columns of the line
+          readErrors.add(
+              new CatalogImportError(
+                  Integer.toString(i), rowError(rowLog), catalogEntry, parts, faultyFields));
         }
       }
       for (String depositKKNumber : depositEntries.keySet()) {

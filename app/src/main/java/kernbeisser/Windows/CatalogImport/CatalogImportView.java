@@ -102,6 +102,7 @@ public class CatalogImportView implements IView<CatalogImportController> {
 
   static final Icon infoIcon = Icons.defaultIcon(FontAwesome.INFO_CIRCLE, Color.DARK_GRAY);
   static final Icon criticalIcon = Icons.defaultIcon(FontAwesome.EXCLAMATION_CIRCLE, Color.ORANGE);
+  static final Icon rowIcon = Icons.defaultIcon(FontAwesome.TABLE, new Color(26, 49, 134));
 
   private void createUIComponents() {
     protocol =
@@ -117,7 +118,12 @@ public class CatalogImportView implements IView<CatalogImportController> {
                     e ->
                         e.getE() instanceof CatalogImportCriticalErrorException
                             ? criticalIcon
-                            : infoIcon)
+                            : e.hasRowDetails() ? rowIcon : infoIcon)
+                .withTooltip(
+                    e ->
+                        e.hasRowDetails()
+                            ? "Katalogzeile mit markierten Fehlern anzeigen"
+                            : "Fehlerdetails anzeigen")
                 .withPreferredWidth(70)
                 .withLeftClickConsumer(e -> controller.showImportErrorDetails(e)));
     protocol.setSortKeys(new RowSorter.SortKey(0, SortOrder.ASCENDING));

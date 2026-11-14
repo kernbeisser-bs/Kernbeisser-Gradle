@@ -5,7 +5,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import javax.swing.*;
+import kernbeisser.DBEntities.Article;
 import kernbeisser.Exeptions.CatalogImportMissingDepositException;
 import kernbeisser.Exeptions.UnknownFileFormatException;
 import kernbeisser.Exeptions.handler.UnexpectedExceptionHandler;
@@ -114,11 +116,19 @@ public class CatalogImportController extends Controller<CatalogImportView, Catal
 
   public void showImportErrorDetails(CatalogImportError e) {
     Exception error = e.getE();
-    if (error instanceof CatalogImportMissingDepositException) {
-      JButton showErrorDetails = new JButton("Fehlerdetails");
+    JButton showErrorDetails = new JButton("Fehlerdetails");
+    showErrorDetails.addActionListener(
+        er -> UnexpectedExceptionHandler.showErrorWarning(error, "Import-Meldung:"));
+    if (e.hasRowDetails()) {
+      Optional<Article> article = model.getKkArticle(e.getEntry());
+      CatalogRowDetails.show(
+          getView().getContent(),
+          e,
+          article,
+          article.map(model::getSaleDates).orElse(List.of()),
+          showErrorDetails);
+    } else if (error instanceof CatalogImportMissingDepositException) {
       String articleNo = ((CatalogImportMissingDepositException) error).getDepositArtNo();
-      showErrorDetails.addActionListener(
-          er -> UnexpectedExceptionHandler.showErrorWarning(error, "Import-Meldung:"));
       UiTools.showCatalogEntryList(
           getView().getContent(), model.getCatalogEntriesByDeposit(articleNo), showErrorDetails);
     } else {
