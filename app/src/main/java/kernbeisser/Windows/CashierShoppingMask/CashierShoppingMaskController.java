@@ -73,30 +73,26 @@ public class CashierShoppingMaskController
   }
 
   public void openMaskWindow() {
-    if (model.isOpenLock()) {
-      getView().messageShoppingMaskAlreadyOpened();
-      return;
-    }
-    boolean allowMultiple =
-        UserSetting.ALLOW_MULTIPLE_SHOPPING_MASK_INSTANCES.getBooleanValue(
-            LogInModel.getLoggedIn());
-    SaleSession saleSession = new SaleSession(SaleSessionType.ASSISTED);
-    saleSession.setCustomer(searchBoxController.getSelectedObject().get());
-    saleSession.setSeller(LogInModel.getLoggedIn());
-    if (!getView().getSecondSeller().toString().equals("Keiner")) {
-      try {
-        saleSession.setSecondSeller(getView().getSecondSeller());
-      } catch (NoResultException e) {
+    try {
+      if (model.isOpenLock()) {
+        getView().messageShoppingMaskAlreadyOpened();
         return;
       }
-    }
-    try {
+      boolean allowMultiple =
+          UserSetting.ALLOW_MULTIPLE_SHOPPING_MASK_INSTANCES.getBooleanValue(
+              LogInModel.getLoggedIn());
+      SaleSession saleSession =
+          model.createSaleSession(
+              SaleSessionType.ASSISTED,
+              searchBoxController.getSelectedObject().get(),
+              getView().getSecondSeller());
       if (!allowMultiple) {
         new ShoppingMaskController(saleSession).withCloseEvent(() -> setAllowOpen(true)).openTab();
         setAllowOpen(false);
       } else new ShoppingMaskController(saleSession).openTab();
     } catch (NotEnoughCreditException e) {
       getView().notEnoughCredit();
+    } catch (NoResultException ignored) {
     }
   }
 
