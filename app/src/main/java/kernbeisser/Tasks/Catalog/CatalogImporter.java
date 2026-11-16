@@ -10,6 +10,9 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import kernbeisser.DBEntities.CatalogEntry;
 import kernbeisser.Enums.MetricUnits;
 import kernbeisser.Enums.VAT;
@@ -59,17 +62,25 @@ public class CatalogImporter {
     return Date.parseInstantDate(s, Date.INSTANT_CATALOG_DATE);
   }
 
-  private static MetricUnits parseUnit(String s) throws InvalidValue {
-    switch (s) {
-      case "kg":
-        return MetricUnits.KILOGRAM;
-      case "l":
-        return MetricUnits.LITER;
-      case "":
-        return null;
-      default:
-        throw new InvalidValue("falsch codierte Einheit");
+  // BNN base price units are written with a reference amount, e.g. "1 kg", "100 g" or "1 l"
+  private static final Pattern BASE_PRICE_UNIT =
+      Pattern.compile("(?:\\d+(?:[.,]\\d+)?\\s*)?(\\S+)");
+
+  static MetricUnits parseUnit(String s) throws InvalidValue {
+    if (s.isBlank()) {
+      return null;
     }
+    Matcher matcher = BASE_PRICE_UNIT.matcher(s.trim());
+    if (!matcher.matches()) {
+      throw new InvalidValue("falsch codierte Einheit: " + s);
+    }
+    return switch (matcher.group(1).toLowerCase()) {
+      case "kg" -> MetricUnits.KILOGRAM;
+      case "g" -> MetricUnits.GRAM;
+      case "l" -> MetricUnits.LITER;
+      case "ml" -> MetricUnits.MILLILITER;
+      default -> throw new InvalidValue("falsch codierte Einheit: " + s);
+    };
   }
 
   private static VAT parseVAT(String s) throws InvalidValue {
@@ -95,7 +106,9 @@ public class CatalogImporter {
     }
     if (trueValue.equals(s)) return true;
     if (falseValue.equals(s)) return false;
-    return null;
+    if (s.isEmpty()) return null;
+    // e.g. shifted columns: report instead of silently storing null in a flag like aktionspreis
+    throw new InvalidValue("ungültiger Wert für " + f.getName() + ": " + s);
   }
 
   private static void parseField(CatalogEntry out, Field declaredField, String part)
@@ -148,17 +161,36 @@ public class CatalogImporter {
   }
 
   public static CatalogEntry parseRowWithLog(String[] parts, List<Exception> errorLog) {
-    return parseRowCore(
-        parts,
-        (e, value_field) -> {
-          errorLog.add(
-              new Exception(
-                  "Fehler beim Schreiben des Wertes \""
-                      + value_field[0]
-                      + "\" in das Feld "
-                      + value_field[1],
-                  e));
-        });
+    return parseRowCore(parts, (e, value_field) -> errorLog.add(fieldError(e, value_field)));
+  }
+
+  // a delimiter followed by an even number of quotes is not inside a quoted field
+  private static final Pattern DELIMITER_OUTSIDE_QUOTES =
+      Pattern.compile(DELIMITER + "(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+
+  /**
+   * Splits a catalog line into its columns. Text fields may be quoted ("...") and then contain the
+   * delimiter, which must not split the field. The quotes are kept as part of the value.
+   */
+  static String[] splitLine(String line) {
+    return line.indexOf('"') < 0 ? line.split(DELIMITER) : DELIMITER_OUTSIDE_QUOTES.split(line);
+  }
+
+  private static Exception fieldError(Exception cause, String[] valueField) {
+    return new Exception(
+        "Fehler beim Schreiben des Wertes \"" + valueField[0] + "\" in das Feld " + valueField[1],
+        cause);
+  }
+
+  private static Exception rowError(List<Exception> fieldErrors) {
+    if (fieldErrors.size() == 1) {
+      return fieldErrors.get(0);
+    }
+    Exception rowError =
+        new Exception(
+            fieldErrors.stream().map(Exception::getMessage).collect(Collectors.joining("; ")));
+    fieldErrors.forEach(rowError::addSuppressed);
+    return rowError;
   }
 
   public static CatalogEntry parseRow(String[] parts) {
@@ -235,8 +267,16 @@ public class CatalogImporter {
       }
       Map<String, Double> depositEntries = new HashMap<>();
       for (int i = 1; i < catalogSource.size() - 1; i++) {
+        String[] parts = splitLine(catalogSource.get(i));
         List<Exception> rowLog = new ArrayList<>();
-        CatalogEntry catalogEntry = parseRowWithLog(catalogSource.get(i).split(DELIMITER), rowLog);
+        List<String> faultyFields = new ArrayList<>();
+        CatalogEntry catalogEntry =
+            parseRowCore(
+                parts,
+                (e, valueField) -> {
+                  rowLog.add(fieldError(e, valueField));
+                  faultyFields.add(valueField[1]);
+                });
         if (validTo != null) {
           catalogEntry.setKatalogGueltigBis(validTo);
         }
@@ -249,8 +289,11 @@ public class CatalogImporter {
         if (!containerDepositNo.trim().isEmpty()) {
           depositEntries.put(containerDepositNo, 0.0);
         }
-        for (Exception e : rowLog) {
-          readErrors.add(new CatalogImportError(Integer.toString(i), e));
+        if (!rowLog.isEmpty()) {
+          // one error per line, the details dialog marks all faulty columns of the line
+          readErrors.add(
+              new CatalogImportError(
+                  Integer.toString(i), rowError(rowLog), catalogEntry, parts, faultyFields));
         }
       }
       for (String depositKKNumber : depositEntries.keySet()) {

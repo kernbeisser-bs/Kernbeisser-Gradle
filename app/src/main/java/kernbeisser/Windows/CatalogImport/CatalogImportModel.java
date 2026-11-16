@@ -10,7 +10,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import kernbeisser.DBConnection.DBConnection;
+import kernbeisser.DBConnection.QueryBuilder;
+import kernbeisser.DBEntities.Article;
 import kernbeisser.DBEntities.CatalogEntry;
+import kernbeisser.DBEntities.Purchase_;
+import kernbeisser.DBEntities.ShoppingItem_;
 import kernbeisser.Enums.Setting;
 import kernbeisser.Exeptions.CatalogImportErrorException;
 import kernbeisser.Exeptions.CatalogImportWarningException;
@@ -156,5 +160,12 @@ public class CatalogImportModel implements IModel<CatalogImportController> {
                 e.getPfandNrBestelleinheit().equals(artikelNr)
                     || e.getPfandNrLadeneinheit().equals(artikelNr))
         .toList();
+  }
+
+  /** Dates of all purchases containing the article. */
+  List<Instant> getSaleDates(Article article) {
+    return QueryBuilder.select(ShoppingItem_.purchase.child(Purchase_.createDate))
+        .where(ShoppingItem_.articleId.eq((long) article.getId()))
+        .getResultList();
   }
 }
