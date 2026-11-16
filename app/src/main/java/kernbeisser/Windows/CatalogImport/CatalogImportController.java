@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import javax.swing.*;
 import kernbeisser.DBEntities.Article;
+import kernbeisser.DBEntities.Repositories.ArticleRepository;
 import kernbeisser.Exeptions.CatalogImportMissingDepositException;
 import kernbeisser.Exeptions.UnknownFileFormatException;
 import kernbeisser.Exeptions.handler.UnexpectedExceptionHandler;
@@ -120,7 +121,7 @@ public class CatalogImportController extends Controller<CatalogImportView, Catal
     showErrorDetails.addActionListener(
         er -> UnexpectedExceptionHandler.showErrorWarning(error, "Import-Meldung:"));
     if (e.hasRowDetails()) {
-      Optional<Article> article = model.getKkArticle(e.getEntry());
+      Optional<Article> article = ArticleRepository.getArticleFromCatalogEntry(e.getEntry());
       CatalogRowDetails.show(
           getView().getContent(),
           e,

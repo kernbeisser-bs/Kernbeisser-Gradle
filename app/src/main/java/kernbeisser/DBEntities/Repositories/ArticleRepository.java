@@ -826,10 +826,13 @@ public class ArticleRepository {
   }
 
   public static Optional<Article> getArticleFromCatalogEntry(CatalogEntry entry) {
+    Integer suppliersItemNumber = parseOrNull(entry.getArtikelNr());
+    if (suppliersItemNumber == null) {
+      return Optional.empty();
+    }
     return QueryBuilder.selectAll(Article.class)
         .where(
-            Article_.suppliersItemNumber.eq(entry.getArtikelNr()),
-            Article_.supplier.eq(KK_SUPPLIER))
+            Article_.suppliersItemNumber.eq(suppliersItemNumber), Article_.supplier.eq(KK_SUPPLIER))
         .getSingleResultOptional();
   }
 

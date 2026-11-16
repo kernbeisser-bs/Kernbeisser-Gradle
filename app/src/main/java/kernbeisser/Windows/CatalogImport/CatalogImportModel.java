@@ -9,13 +9,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import kernbeisser.DBConnection.DBConnection;
 import kernbeisser.DBConnection.QueryBuilder;
 import kernbeisser.DBEntities.Article;
 import kernbeisser.DBEntities.CatalogEntry;
 import kernbeisser.DBEntities.Purchase_;
-import kernbeisser.DBEntities.Repositories.ArticleRepository;
 import kernbeisser.DBEntities.ShoppingItem_;
 import kernbeisser.Enums.Setting;
 import kernbeisser.Exeptions.CatalogImportErrorException;
@@ -162,14 +160,6 @@ public class CatalogImportModel implements IModel<CatalogImportController> {
                 e.getPfandNrBestelleinheit().equals(artikelNr)
                     || e.getPfandNrLadeneinheit().equals(artikelNr))
         .toList();
-  }
-
-  Optional<Article> getKkArticle(CatalogEntry entry) {
-    try {
-      return ArticleRepository.getByKkItemNumber(entry.getArtikelNrInt());
-    } catch (NumberFormatException e) {
-      return Optional.empty();
-    }
   }
 
   /** Dates of all purchases containing the article. */
