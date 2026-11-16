@@ -1,0 +1,70 @@
+# Development environment for Kernbeisser.
+#
+#   docker compose up -d db                  # just the database (default)
+#   docker compose --profile gui up --build  # + the app in a browser (noVNC) with a debug port
+#   docker compose --profile tools up -d     # + Adminer web UI for the database
+#
+# Settings can be overridden in docker/.env (see .env.example). The Makefile wraps all of this.
+name: kernbeisser
+
+services:
+  db:
+    image: mariadb:${MARIADB_VERSION:-10.11}
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-kernbeisser}
+      MARIADB_USER: ${DB_USER:-kernbeisser}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-kernbeisser}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # Case-insensitive table names, so dumps from Windows servers (lowercase names) and
+      # Linux servers (mixed case, e.g. "Article") can both be imported and used.
+      - --lower-case-table-names=1
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${DB_PORT:-3306}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      # *.sql / *.sql.gz / *.sh in here are imported once, when the volume is first created.
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  gui:
+    profiles: [gui]
+    image: kernbeisser-gui
+    build: ./gui
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mariadb://db:3306/${DB_NAME:-kernbeisser}
+      DB_USER: ${DB_USER:-kernbeisser}
+      DB_PASSWORD: ${DB_PASSWORD:-kernbeisser}
+      SCREEN_GEOMETRY: ${SCREEN_GEOMETRY:-1600x1000x24}
+      JDWP_SUSPEND: ${JDWP_SUSPEND:-n}
+      NOVNC_PORT: ${NOVNC_PORT:-6080}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${NOVNC_PORT:-6080}:6080"
+      - "${BIND_ADDRESS:-127.0.0.1}:${VNC_PORT:-5900}:5900"
+      - "${BIND_ADDRESS:-127.0.0.1}:${DEBUG_PORT:-5005}:5005"
+    volumes:
+      # Output of `make build`; copied into the container on start.
+      - ../build/deploy:/opt/kernbeisser-dist:ro
+
+  adminer:
+    profiles: [tools]
+    image: adminer:4
+    depends_on:
+      - db
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ADMINER_PORT:-8081}:8080"
+
+volumes:
+  db-data:

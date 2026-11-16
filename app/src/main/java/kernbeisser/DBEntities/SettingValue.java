@@ -36,7 +36,7 @@ public class SettingValue {
   @Setter(onMethod_ = {@Key(PermissionKey.SETTING_VALUE_ID_WRITE)})
   private int id;
 
-  @Column(columnDefinition = "character varying (100) not null)")
+  @Column(columnDefinition = "character varying (100) not null")
   @Enumerated(value = EnumType.STRING)
   @Convert(converter = SettingValueConverter.class)
   @Getter(onMethod_ = {@Key(PermissionKey.SETTING_VALUE_SETTING_READ)})

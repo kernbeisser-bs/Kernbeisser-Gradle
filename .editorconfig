@@ -1,0 +1,26 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# google-java-format (enforced by spotless, `make format`)
+[*.java]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+[{*.gradle,*.json,*.yaml,*.yml,*.xml}]
+indent_style = space
+indent_size = 4
+
+[{*.json,*.yaml,*.yml}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+[*.bat]
+end_of_line = crlf

@@ -1,0 +1,60 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "make dev-setup",
+      "detail": "Start the dev database, create .dev/config.json, build security.jar",
+      "type": "shell",
+      "command": "make dev-setup",
+      "problemMatcher": []
+    },
+    {
+      "label": "make build",
+      "type": "shell",
+      "command": "make build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "make test",
+      "type": "shell",
+      "command": "make test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "make format",
+      "type": "shell",
+      "command": "make format",
+      "problemMatcher": []
+    },
+    {
+      "label": "make debug",
+      "detail": "Build and run the app from the jar with a debug port on 5005",
+      "type": "shell",
+      "command": "make debug",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "make gui",
+      "detail": "Run the app in Docker (http://localhost:6080), debug port 5005",
+      "type": "shell",
+      "command": "make gui",
+      "problemMatcher": []
+    },
+    {
+      "label": "make db-shell",
+      "type": "shell",
+      "command": "make db-shell",
+      "problemMatcher": []
+    },
+    {
+      "label": "make down",
+      "detail": "Stop all containers",
+      "type": "shell",
+      "command": "make down",
+      "problemMatcher": []
+    }
+  ]
+}

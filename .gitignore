@@ -206,3 +206,13 @@ gradle-app.setting
 /**/META-INF/MANIFEST.MF
 /app/src/main/generated
 /.metadata/
+
+# Local development environment (see README.md)
+/.dev/
+# VS Code Java output
+/app/bin/
+/security/bin/
+/kbmetamodel/bin/
+/docker/.env
+/docker/initdb/*
+!/docker/initdb/README.md

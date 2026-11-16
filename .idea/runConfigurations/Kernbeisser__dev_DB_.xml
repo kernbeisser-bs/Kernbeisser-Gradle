@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Kernbeisser (dev DB)" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="21" />
+    <option name="MAIN_CLASS_NAME" value="kernbeisser.Main" />
+    <module name="kernbeisser.app.main" />
+    <option name="PROGRAM_PARAMETERS" value="-configFile:$PROJECT_DIR$/.dev/config.json" />
+    <option name="VM_PARAMETERS" value="-Xmx1024m -splash:production/KernbeisserSplash.png -javaagent:security/build/libs/security.jar" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Dev setup (make dev-setup)" run_configuration_type="ShConfigurationType" />
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

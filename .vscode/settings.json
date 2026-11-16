@@ -1,0 +1,22 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.gradle.annotationProcessing.enabled": true,
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.test.config": {
+    "vmArgs": ["-Dfile.encoding=UTF-8"]
+  },
+  "[java]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": false
+  },
+  "files.encoding": "utf8",
+  "files.exclude": {
+    "**/.gradle": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/bin": true,
+    ".dev": true
+  }
+}
